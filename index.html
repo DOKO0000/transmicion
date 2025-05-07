@@ -3,25 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transmisión Privada</title>
+    <title>Acceso a Transmisión Privada</title>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root {
-            --primary-color: #4285f4;
-            --success-color: #34a853;
-            --danger-color: #ea4335;
-            --light-gray: #f5f5f5;
-            --dark-gray: #333;
-            --border-radius: 8px;
-        }
-        
         body {
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            background-color: var(--light-gray);
+            background-color: #f5f5f5;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -31,7 +22,7 @@
         .access-container {
             background: white;
             padding: 30px;
-            border-radius: var(--border-radius);
+            border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 400px;
@@ -39,7 +30,7 @@
         }
         
         .access-container h2 {
-            color: var(--dark-gray);
+            color: #333;
             margin-bottom: 20px;
         }
         
@@ -51,149 +42,35 @@
             width: 100%;
             padding: 12px;
             border: 1px solid #ddd;
-            border-radius: var(--border-radius);
+            border-radius: 8px;
             font-size: 16px;
         }
         
         .access-btn {
             width: 100%;
             padding: 12px;
-            background-color: var(--primary-color);
+            background-color: #4285f4;
             color: white;
             border: none;
-            border-radius: var(--border-radius);
+            border-radius: 8px;
             cursor: pointer;
             font-size: 16px;
         }
         
         .access-error {
-            color: var(--danger-color);
+            color: #ea4335;
             margin-top: 15px;
-        }
-
-        /* Estilos para la app */
-        #appContent {
-            display: none;
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .video-container {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .video-box {
-            flex: 1;
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        video {
-            width: 100%;
-            border-radius: 5px;
-            background: #000;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        button {
-            padding: 10px 20px;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        #startBtn {
-            background-color: var(--success-color);
-            color: white;
-        }
-
-        #stopBtn {
-            background-color: var(--danger-color);
-            color: white;
-        }
-
-        .chat-container {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .chat-messages {
-            height: 300px;
-            overflow-y: auto;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .chat-input {
-            display: flex;
-            gap: 10px;
-        }
-
-        #messageInput {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: var(--border-radius);
-        }
-
-        #sendMessage {
-            background-color: var(--primary-color);
-            color: white;
         }
     </style>
 </head>
 <body>
-    <!-- Pantalla de acceso -->
-    <div id="accessContainer" class="access-container">
+    <div class="access-container">
         <h2>Acceso a Transmisión Privada</h2>
         <div class="form-group">
             <input type="password" id="accessKey" placeholder="Ingresa la palabra clave">
         </div>
         <button class="access-btn" onclick="checkAccess()">Ingresar</button>
         <div id="accessError" class="access-error"></div>
-    </div>
-    
-    <!-- Aplicación principal -->
-    <div id="appContent">
-        <div class="video-container">
-            <div class="video-box">
-                <h3>Tu Cámara</h3>
-                <video id="localVideo" autoplay muted></video>
-            </div>
-            <div class="video-box">
-                <h3>Transmisión en Vivo</h3>
-                <video id="remoteVideo" autoplay></video>
-            </div>
-        </div>
-        
-        <div class="controls">
-            <button id="startBtn">Iniciar Transmisión</button>
-            <button id="stopBtn" disabled>Detener Transmisión</button>
-        </div>
-        
-        <div class="chat-container">
-            <h3>Chat en Vivo</h3>
-            <div class="chat-messages" id="chatMessages"></div>
-            <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
-                <button id="sendMessage">Enviar</button>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -212,27 +89,10 @@
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
-        // Variables globales
-        let localStream;
-        let peerConnection;
-        const ACCESS_KEY = "MOOKA"; // Palabra clave de acceso
-        const roomId = "private-room";
-        let userIP = "Desconocida";
+        // Palabra clave de acceso
+        const ACCESS_KEY = "MOOKA";
 
-        // Elementos del DOM
-        const accessContainer = document.getElementById('accessContainer');
-        const appContent = document.getElementById('appContent');
-        const accessKeyInput = document.getElementById('accessKey');
-        const accessError = document.getElementById('accessError');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        const chatMessages = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendMessageBtn = document.getElementById('sendMessage');
-
-        // Obtener la IP del usuario (usando un servicio externo)
+        // Obtener la IP del usuario
         async function getUserIP() {
             try {
                 const response = await fetch('https://api.ipify.org?format=json');
@@ -244,136 +104,37 @@
             }
         }
 
-        // Verificar acceso
-        async function checkAccess() {
-            const enteredKey = accessKeyInput.value.trim();
-            
-            if (enteredKey === ACCESS_KEY) {
-                // Obtener y registrar IP
-                userIP = await getUserIP();
-                await registerAccess(userIP);
-                
-                // Mostrar aplicación
-                accessContainer.style.display = 'none';
-                appContent.style.display = 'block';
-                
-                // Iniciar conexión con Firebase
-                initFirebaseConnection();
-            } else {
-                accessError.textContent = "Palabra clave incorrecta";
-            }
-        }
-
         // Registrar acceso en Firebase
         async function registerAccess(ip) {
             const timestamp = new Date().toISOString();
             await database.ref('accessLogs').push().set({
                 ip: ip,
                 timestamp: timestamp,
-                accessKeyUsed: accessKeyInput.value.trim()
+                accessKeyUsed: document.getElementById('accessKey').value.trim()
             });
         }
 
-        // Inicializar conexión con Firebase
-        function initFirebaseConnection() {
-            // Referencia a la sala de chat
-            const chatRef = database.ref('rooms/' + roomId + '/messages');
+        // Verificar acceso
+        async function checkAccess() {
+            const accessKeyInput = document.getElementById('accessKey');
+            const accessError = document.getElementById('accessError');
+            const enteredKey = accessKeyInput.value.trim();
             
-            // Escuchar nuevos mensajes
-            chatRef.limitToLast(100).on('child_added', snapshot => {
-                const message = snapshot.val();
-                addMessageToChat(message.userName || "Anónimo", message.text);
-            });
-            
-            // Registrar usuario como conectado
-            const userRef = database.ref('rooms/' + roomId + '/connections/' + userIP.replace(/\./g, '_'));
-            userRef.set({
-                ip: userIP,
-                lastActive: firebase.database.ServerValue.TIMESTAMP
-            });
-            
-            // Actualizar última actividad periódicamente
-            setInterval(() => {
-                userRef.update({
-                    lastActive: firebase.database.ServerValue.TIMESTAMP
-                });
-            }, 30000);
-            
-            // Manejar desconexión
-            window.addEventListener('beforeunload', () => {
-                userRef.remove();
-            });
-        }
-
-        // Funciones del chat
-        function addMessageToChat(user, message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.innerHTML = `<strong>${user}:</strong> ${message}`;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (message) {
-                // Guardar mensaje en Firebase
-                await database.ref('rooms/' + roomId + '/messages').push().set({
-                    text: message,
-                    userName: `Usuario-${userIP.substring(userIP.lastIndexOf('.') + 1)}`,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP,
-                    ip: userIP
-                });
+            if (enteredKey === ACCESS_KEY) {
+                // Obtener y registrar IP
+                const userIP = await getUserIP();
+                await registerAccess(userIP);
                 
-                messageInput.value = '';
+                // Redirigir a la página de transmisión
+                window.location.href = "transmision.html";
+            } else {
+                accessError.textContent = "Palabra clave incorrecta";
             }
         }
 
-        // Funciones de transmisión
-        async function startStreaming() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: true, 
-                    audio: true 
-                });
-                
-                localVideo.srcObject = localStream;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                
-                addMessageToChat("Sistema", "Transmisión iniciada");
-            } catch (error) {
-                console.error("Error al acceder a dispositivos:", error);
-                alert("No se pudo acceder a la cámara/micrófono. Asegúrate de dar los permisos necesarios.");
-            }
-        }
-
-        function stopStreaming() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localVideo.srcObject = null;
-            }
-            
-            if (peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            
-            addMessageToChat("Sistema", "Transmisión detenida");
-        }
-
-        // Event listeners
-        accessKeyInput.addEventListener('keypress', (e) => {
+        // Permitir acceso con Enter
+        document.getElementById('accessKey').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') checkAccess();
-        });
-
-        startBtn.addEventListener('click', startStreaming);
-        stopBtn.addEventListener('click', stopStreaming);
-        sendMessageBtn.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
         });
     </script>
 </body>
