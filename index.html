@@ -3,39 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transmisión en Directo con Chat</title>
+    <title>Transmisión en Directo con Usuarios Reales</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <style>
+        :root {
+            --primary-color: #4285f4;
+            --success-color: #34a853;
+            --danger-color: #ea4335;
+            --warning-color: #fbbc05;
+            --light-gray: #f5f5f5;
+            --dark-gray: #333;
+            --medium-gray: #666;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
         body {
             font-family: 'Arial', sans-serif;
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background-color: var(--light-gray);
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 20px;
         }
+        
         h1 {
-            color: #333;
+            color: var(--dark-gray);
             text-align: center;
             grid-column: 1 / -1;
+            margin-bottom: 20px;
         }
+        
+        /* Auth Forms */
+        .auth-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .auth-box {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            width: 100%;
+            max-width: 400px;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .auth-tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: bold;
+        }
+        
+        .auth-form {
+            display: none;
+        }
+        
+        .auth-form.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+        }
+        
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        
+        .auth-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .auth-error {
+            color: var(--danger-color);
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        /* User Info */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .logout-btn {
+            background: none;
+            border: none;
+            color: var(--medium-gray);
+            cursor: pointer;
+        }
+        
+        /* Video Section */
         .video-container {
             display: flex;
             flex-direction: column;
             gap: 20px;
         }
+        
         .video-box {
             background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
             padding: 15px;
         }
+        
         video {
             width: 100%;
             border-radius: 5px;
             background: #000;
         }
+        
         .controls {
             margin-top: 20px;
             display: flex;
@@ -43,46 +183,55 @@
             gap: 15px;
             grid-column: 1 / -1;
         }
+        
         button {
             padding: 10px 20px;
             font-size: 16px;
             border: none;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             cursor: pointer;
             transition: all 0.3s;
         }
+        
         #startBtn {
-            background-color: #4CAF50;
+            background-color: var(--success-color);
             color: white;
         }
+        
         #stopBtn {
-            background-color: #f44336;
+            background-color: var(--danger-color);
             color: white;
         }
+        
         .status {
             margin-top: 20px;
             padding: 10px;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             text-align: center;
         }
+        
         .online {
             background-color: #e8f5e9;
             color: #2e7d32;
         }
+        
         .viewers {
             margin-top: 10px;
             font-size: 14px;
-            color: #666;
+            color: var(--medium-gray);
         }
+        
+        /* Chat Section */
         .chat-container {
             background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
             padding: 15px;
             display: flex;
             flex-direction: column;
             height: 600px;
         }
+        
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -90,6 +239,7 @@
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
         }
+        
         .message {
             margin-bottom: 10px;
             padding: 8px 12px;
@@ -97,78 +247,194 @@
             background: #f1f1f1;
             max-width: 80%;
         }
+        
         .message.own {
             margin-left: auto;
-            background: #0084ff;
+            background: var(--primary-color);
             color: white;
         }
+        
+        .message-system {
+            text-align: center;
+            background: none;
+            color: var(--medium-gray);
+            font-size: 0.9em;
+        }
+        
         .chat-input {
             display: flex;
             gap: 10px;
         }
+        
         #messageInput {
             flex: 1;
             padding: 10px;
             border: 1px solid #ddd;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
         }
+        
         #sendMessage {
-            background-color: #0084ff;
+            background-color: var(--primary-color);
             color: white;
         }
+        
         .user-count {
             font-size: 14px;
-            color: #666;
+            color: var(--medium-gray);
             margin-bottom: 10px;
+        }
+        
+        /* Admin Controls */
+        .admin-controls {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: var(--border-radius);
+            display: none;
         }
     </style>
 </head>
 <body>
-    <h1>Plataforma de Transmisión con Chat en Vivo</h1>
-    
-    <div class="controls">
-        <button id="startBtn">Iniciar Transmisión</button>
-        <button id="stopBtn" disabled>Detener Transmisión</button>
-    </div>
-    
-    <div id="status" class="status" style="display: none;">
-        Estás transmitiendo en vivo ahora.
-        <div class="viewers">0 espectadores</div>
-    </div>
-    
-    <div class="video-container">
-        <div class="video-box">
-            <h3>Tu Cámara</h3>
-            <video id="localVideo" autoplay muted></video>
+    <!-- Auth Modal -->
+    <div id="authContainer" class="auth-container">
+        <div class="auth-box">
+            <div class="auth-tabs">
+                <div class="auth-tab active" onclick="switchTab('login')">Iniciar Sesión</div>
+                <div class="auth-tab" onclick="switchTab('register')">Registrarse</div>
+            </div>
+            
+            <div id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••">
+                </div>
+                <button class="auth-btn" onclick="login()">Ingresar</button>
+                <div id="loginError" class="auth-error"></div>
+            </div>
+            
+            <div id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label for="registerName">Nombre</label>
+                    <input type="text" id="registerName" placeholder="Tu nombre">
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Contraseña</label>
+                    <input type="password" id="registerPassword" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label for="registerConfirm">Confirmar Contraseña</label>
+                    <input type="password" id="registerConfirm" placeholder="••••••••">
+                </div>
+                <button class="auth-btn" onclick="register()">Registrarse</button>
+                <div id="registerError" class="auth-error"></div>
+            </div>
         </div>
-        <div class="video-box">
-            <h3>Transmisión en Vivo</h3>
-            <video id="remoteVideo" autoplay></video>
+    </div>
+    
+    <!-- Main App (hidden until auth) -->
+    <div id="appContent" style="display: none;">
+        <h1>Transmisión en Directo con Usuarios Reales</h1>
+        
+        <!-- User Info -->
+        <div class="user-info">
+            <div class="user-avatar" id="userAvatar"></div>
+            <span id="userName"></span>
+            <button class="logout-btn" onclick="logout()">(Salir)</button>
+        </div>
+        
+        <!-- Admin Controls -->
+        <div id="adminControls" class="admin-controls">
+            <h3>Controles de Administrador</h3>
+            <button id="banUserBtn" onclick="showBanModal()">Expulsar Usuario</button>
+            <button id="muteUserBtn" onclick="showMuteModal()">Silenciar Usuario</button>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Iniciar Transmisión</button>
+            <button id="stopBtn" disabled>Detener Transmisión</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;">
+            Estás transmitiendo en vivo ahora.
+            <div class="viewers">0 espectadores</div>
+        </div>
+        
+        <div class="video-container">
+            <div class="video-box">
+                <h3>Tu Cámara</h3>
+                <video id="localVideo" autoplay muted></video>
+            </div>
+            <div class="video-box">
+                <h3>Transmisión en Vivo</h3>
+                <video id="remoteVideo" autoplay></video>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <h3>Chat en Vivo</h3>
+            <div class="user-count">Usuarios conectados: <span id="userCount">0</span></div>
+            <div class="chat-messages" id="chatMessages">
+                <!-- Mensajes aparecerán aquí -->
+            </div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
+                <button id="sendMessage">Enviar</button>
+            </div>
         </div>
     </div>
 
-    <div class="chat-container">
-        <h3>Chat en Vivo</h3>
-        <div class="user-count">Usuarios conectados: <span id="userCount">1</span></div>
-        <div class="chat-messages" id="chatMessages">
-            <!-- Mensajes aparecerán aquí -->
-        </div>
-        <div class="chat-input">
-            <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
-            <button id="sendMessage">Enviar</button>
+    <!-- Modal para acciones de admin -->
+    <div id="adminModal" class="auth-container" style="display: none;">
+        <div class="auth-box">
+            <h3 id="modalTitle">Título del Modal</h3>
+            <div class="form-group">
+                <label id="modalLabel">Etiqueta</label>
+                <input type="text" id="modalInput" placeholder="">
+            </div>
+            <button class="auth-btn" id="modalConfirmBtn">Confirmar</button>
+            <button class="auth-btn" style="background: var(--medium-gray); margin-top: 10px;" onclick="hideAdminModal()">Cancelar</button>
         </div>
     </div>
 
     <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDzQjZ4QZQZQZQZQZQZQZQZQZQZQZQZQZQ",
+            authDomain: "fotocredencial-30d54.firebaseapp.com",
+            databaseURL: "https://fotocredencial-30d54-default-rtdb.firebaseio.com",
+            projectId: "fotocredencial-30d54",
+            storageBucket: "fotocredencial-30d54.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:1234567890abcdef"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const auth = firebase.auth();
+
         // Variables globales
         let localStream;
         let peerConnection;
-        let socket;
-        let viewerCount = 0;
-        let currentUser = 'Usuario-' + Math.floor(Math.random() * 1000);
-        const roomId = 'public-room-123'; // ID de sala pública
+        let currentUser = null;
+        let roomId = 'public-room';
+        let usersOnline = {};
 
         // Elementos del DOM
+        const authContainer = document.getElementById('authContainer');
+        const appContent = document.getElementById('appContent');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginError = document.getElementById('loginError');
+        const registerError = document.getElementById('registerError');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
         const statusDiv = document.getElementById('status');
@@ -179,8 +445,16 @@
         const messageInput = document.getElementById('messageInput');
         const sendMessageBtn = document.getElementById('sendMessage');
         const userCountSpan = document.getElementById('userCount');
+        const userNameSpan = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        const adminControls = document.getElementById('adminControls');
+        const adminModal = document.getElementById('adminModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalLabel = document.getElementById('modalLabel');
+        const modalInput = document.getElementById('modalInput');
+        const modalConfirmBtn = document.getElementById('modalConfirmBtn');
 
-        // Configuración de conexión
+        // Configuración de conexión WebRTC
         const configuration = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -189,61 +463,193 @@
             ]
         };
 
-        // Simulación de conexión WebSocket
-        function connectToWebSocket() {
-            console.log('Conectado al servidor WebSocket (simulado)');
-            
-            // Simular recepción de mensajes
-            setInterval(() => {
-                if (Math.random() > 0.7) { // 30% de probabilidad de recibir mensaje
-                    const randomUsers = ['Ana', 'Carlos', 'Beatriz', 'David', 'Elena'];
-                    const randomUser = randomUsers[Math.floor(Math.random() * randomUsers.length)];
-                    const randomMessages = [
-                        "¡Hola a todos!",
-                        "¿Cómo están?",
-                        "Buena transmisión",
-                        "¿Qué opinan del directo?",
-                        "👋",
-                        "¡Genial contenido!"
-                    ];
-                    const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)];
-                    
-                    addMessageToChat(randomUser, randomMessage, false);
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verificar si hay usuario logueado
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    // Usuario logueado
+                    currentUser = {
+                        uid: user.uid,
+                        email: user.email,
+                        name: user.displayName || user.email.split('@')[0],
+                        isAdmin: user.email === 'admin@example.com' // Cambia esto por tu lógica de admin
+                    };
+                    initApp();
+                } else {
+                    // No hay usuario logueado
+                    authContainer.style.display = 'flex';
+                    appContent.style.display = 'none';
                 }
-            }, 3000);
-            
-            // Simular cambio en número de usuarios
-            setInterval(() => {
-                const change = Math.floor(Math.random() * 3) - 1; // -1, 0 o 1
-                viewerCount = Math.max(1, viewerCount + change);
-                viewersSpan.textContent = `${viewerCount} espectadores`;
-                userCountSpan.textContent = viewerCount;
-            }, 5000);
+            });
+        });
+
+        // Funciones de autenticación
+        function switchTab(tab) {
+            loginForm.classList.remove('active');
+            registerForm.classList.remove('active');
+            document.querySelector(`.auth-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}Form`).classList.add('active');
+            loginError.textContent = '';
+            registerError.textContent = '';
         }
 
-        // Añadir mensaje al chat
-        function addMessageToChat(user, message, isOwn = false) {
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                loginError.textContent = 'Por favor completa todos los campos';
+                return;
+            }
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                // onAuthStateChanged se encargará del resto
+            } catch (error) {
+                loginError.textContent = error.message;
+            }
+        }
+
+        async function register() {
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirm = document.getElementById('registerConfirm').value;
+            
+            if (!name || !email || !password || !confirm) {
+                registerError.textContent = 'Por favor completa todos los campos';
+                return;
+            }
+            
+            if (password !== confirm) {
+                registerError.textContent = 'Las contraseñas no coinciden';
+                return;
+            }
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                await userCredential.user.updateProfile({ displayName: name });
+                
+                // Guardar información adicional en la base de datos
+                await database.ref('users/' + userCredential.user.uid).set({
+                    name: name,
+                    email: email,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                
+                // onAuthStateChanged se encargará del resto
+            } catch (error) {
+                registerError.textContent = error.message;
+            }
+        }
+
+        function logout() {
+            stopStreaming();
+            auth.signOut();
+        }
+
+        function initApp() {
+            authContainer.style.display = 'none';
+            appContent.style.display = 'block';
+            
+            // Mostrar info de usuario
+            userNameSpan.textContent = currentUser.name;
+            userAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+            
+            // Mostrar controles de admin si corresponde
+            if (currentUser.isAdmin) {
+                adminControls.style.display = 'block';
+            }
+            
+            // Iniciar conexión con Firebase
+            initFirebaseConnection();
+            
+            // Mensaje de bienvenida
+            addSystemMessage(`Bienvenido, ${currentUser.name}!`);
+        }
+
+        // Funciones de Firebase
+        function initFirebaseConnection() {
+            // Referencia a la sala de chat
+            const chatRef = database.ref('rooms/' + roomId + '/messages');
+            
+            // Escuchar nuevos mensajes
+            chatRef.limitToLast(100).on('child_added', snapshot => {
+                const message = snapshot.val();
+                addMessageToChat(message.userName, message.text, message.userId === currentUser.uid, message.userId);
+            });
+            
+            // Actualizar contador de usuarios
+            const usersRef = database.ref('rooms/' + roomId + '/users');
+            usersRef.on('value', snapshot => {
+                const users = snapshot.val() || {};
+                usersOnline = users;
+                userCountSpan.textContent = Object.keys(users).length;
+                viewersSpan.textContent = `${Object.keys(users).length} espectadores`;
+            });
+            
+            // Registrar usuario como conectado
+            const userRef = database.ref('rooms/' + roomId + '/users/' + currentUser.uid);
+            userRef.set({
+                name: currentUser.name,
+                isAdmin: currentUser.isAdmin || false,
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            // Actualizar última actividad periódicamente
+            setInterval(() => {
+                userRef.update({
+                    lastActive: firebase.database.ServerValue.TIMESTAMP
+                });
+            }, 30000);
+            
+            // Manejar desconexión
+            window.addEventListener('beforeunload', () => {
+                userRef.remove();
+            });
+        }
+
+        // Funciones del chat
+        function addMessageToChat(user, message, isOwn = false, userId = '') {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message');
             if (isOwn) messageDiv.classList.add('own');
-            messageDiv.innerHTML = `<strong>${user}:</strong> ${message}`;
+            
+            // Verificar si es admin
+            const isAdmin = usersOnline[userId] && usersOnline[userId].isAdmin;
+            const adminBadge = isAdmin ? ' <span style="color:var(--danger-color)">[Admin]</span>' : '';
+            
+            messageDiv.innerHTML = `<strong>${user}${adminBadge}:</strong> ${message}`;
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        // Enviar mensaje
-        function sendMessage() {
+        function addSystemMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', 'message-system');
+            messageDiv.textContent = message;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
             const message = messageInput.value.trim();
             if (message) {
-                addMessageToChat(currentUser, message, true);
-                // En una implementación real, enviarías el mensaje al servidor WebSocket
-                console.log('Mensaje enviado:', message);
+                // Guardar mensaje en Firebase
+                await database.ref('rooms/' + roomId + '/messages').push().set({
+                    text: message,
+                    userName: currentUser.name,
+                    userId: currentUser.uid,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+                
                 messageInput.value = '';
             }
         }
 
-        // Event listeners
-        startBtn.addEventListener('click', async () => {
+        // Funciones de transmisión
+        async function startStreaming() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ 
                     video: true, 
@@ -255,22 +661,14 @@
                 stopBtn.disabled = false;
                 statusDiv.style.display = 'block';
                 
-                connectToWebSocket();
-                addMessageToChat('Sistema', 'Has iniciado la transmisión', false);
+                addSystemMessage('Has iniciado la transmisión');
                 
                 console.log('Transmisión iniciada');
             } catch (error) {
                 console.error('Error al acceder a los dispositivos:', error);
                 alert('No se pudo acceder a la cámara/micrófono. Asegúrate de dar los permisos necesarios.');
             }
-        });
-
-        stopBtn.addEventListener('click', stopStreaming);
-
-        sendMessageBtn.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
+        }
 
         function stopStreaming() {
             if (localStream) {
@@ -287,17 +685,66 @@
             stopBtn.disabled = true;
             statusDiv.style.display = 'none';
             
-            addMessageToChat('Sistema', 'Has detenido la transmisión', false);
+            addSystemMessage('Has detenido la transmisión');
             console.log('Transmisión detenida');
         }
 
-        // Manejar cierre de página
-        window.addEventListener('beforeunload', () => {
-            stopStreaming();
+        // Funciones de administrador
+        function showBanModal() {
+            modalTitle.textContent = 'Expulsar Usuario';
+            modalLabel.textContent = 'ID del usuario a expulsar:';
+            modalInput.placeholder = 'Ingresa el ID del usuario';
+            modalConfirmBtn.onclick = banUser;
+            adminModal.style.display = 'flex';
+        }
+
+        function showMuteModal() {
+            modalTitle.textContent = 'Silenciar Usuario';
+            modalLabel.textContent = 'ID del usuario a silenciar:';
+            modalInput.placeholder = 'Ingresa el ID del usuario';
+            modalConfirmBtn.onclick = muteUser;
+            adminModal.style.display = 'flex';
+        }
+
+        function hideAdminModal() {
+            adminModal.style.display = 'none';
+            modalInput.value = '';
+        }
+
+        async function banUser() {
+            const userId = modalInput.value.trim();
+            if (userId && usersOnline[userId]) {
+                await database.ref('rooms/' + roomId + '/users/' + userId).remove();
+                addSystemMessage(`Usuario ${usersOnline[userId].name} ha sido expulsado`);
+                hideAdminModal();
+            } else {
+                alert('ID de usuario no válido');
+            }
+        }
+
+        async function muteUser() {
+            const userId = modalInput.value.trim();
+            if (userId && usersOnline[userId]) {
+                await database.ref('rooms/' + roomId + '/muted/' + userId).set(true);
+                addSystemMessage(`Usuario ${usersOnline[userId].name} ha sido silenciado`);
+                hideAdminModal();
+            } else {
+                alert('ID de usuario no válido');
+            }
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startStreaming);
+        stopBtn.addEventListener('click', stopStreaming);
+        sendMessageBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
         });
 
-        // Mensaje inicial
-        addMessageToChat('Sistema', `Bienvenido al chat, ${currentUser}!`, false);
+        window.addEventListener('beforeunload', () => {
+            stopStreaming();
+            database.ref('rooms/' + roomId + '/users/' + currentUser.uid).remove();
+        });
     </script>
 </body>
 </html>
