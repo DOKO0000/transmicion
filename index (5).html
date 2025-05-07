@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transmisión en Directo con Chat</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            grid-column: 1 / -1;
+        }
+        .video-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .video-box {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px;
+        }
+        video {
+            width: 100%;
+            border-radius: 5px;
+            background: #000;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            grid-column: 1 / -1;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #startBtn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #stopBtn {
+            background-color: #f44336;
+            color: white;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .online {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .viewers {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        .chat-container {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            background: #f1f1f1;
+            max-width: 80%;
+        }
+        .message.own {
+            margin-left: auto;
+            background: #0084ff;
+            color: white;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        #messageInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #sendMessage {
+            background-color: #0084ff;
+            color: white;
+        }
+        .user-count {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Plataforma de Transmisión con Chat en Vivo</h1>
+    
+    <div class="controls">
+        <button id="startBtn">Iniciar Transmisión</button>
+        <button id="stopBtn" disabled>Detener Transmisión</button>
+    </div>
+    
+    <div id="status" class="status" style="display: none;">
+        Estás transmitiendo en vivo ahora.
+        <div class="viewers">0 espectadores</div>
+    </div>
+    
+    <div class="video-container">
+        <div class="video-box">
+            <h3>Tu Cámara</h3>
+            <video id="localVideo" autoplay muted></video>
+        </div>
+        <div class="video-box">
+            <h3>Transmisión en Vivo</h3>
+            <video id="remoteVideo" autoplay></video>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <h3>Chat en Vivo</h3>
+        <div class="user-count">Usuarios conectados: <span id="userCount">1</span></div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- Mensajes aparecerán aquí -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="messageInput" placeholder="Escribe un mensaje...">
+            <button id="sendMessage">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let localStream;
+        let peerConnection;
+        let socket;
+        let viewerCount = 0;
+        let currentUser = 'Usuario-' + Math.floor(Math.random() * 1000);
+        const roomId = 'public-room-123'; // ID de sala pública
+
+        // Elementos del DOM
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('status');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const viewersSpan = document.querySelector('.viewers');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageBtn = document.getElementById('sendMessage');
+        const userCountSpan = document.getElementById('userCount');
+
+        // Configuración de conexión
+        const configuration = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        };
+
+        // Simulación de conexión WebSocket
+        function connectToWebSocket() {
+            console.log('Conectado al servidor WebSocket (simulado)');
+            
+            // Simular recepción de mensajes
+            setInterval(() => {
+                if (Math.random() > 0.7) { // 30% de probabilidad de recibir mensaje
+                    const randomUsers = ['Ana', 'Carlos', 'Beatriz', 'David', 'Elena'];
+                    const randomUser = randomUsers[Math.floor(Math.random() * randomUsers.length)];
+                    const randomMessages = [
+                        "¡Hola a todos!",
+                        "¿Cómo están?",
+                        "Buena transmisión",
+                        "¿Qué opinan del directo?",
+                        "👋",
+                        "¡Genial contenido!"
+                    ];
+                    const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)];
+                    
+                    addMessageToChat(randomUser, randomMessage, false);
+                }
+            }, 3000);
+            
+            // Simular cambio en número de usuarios
+            setInterval(() => {
+                const change = Math.floor(Math.random() * 3) - 1; // -1, 0 o 1
+                viewerCount = Math.max(1, viewerCount + change);
+                viewersSpan.textContent = `${viewerCount} espectadores`;
+                userCountSpan.textContent = viewerCount;
+            }, 5000);
+        }
+
+        // Añadir mensaje al chat
+        function addMessageToChat(user, message, isOwn = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            if (isOwn) messageDiv.classList.add('own');
+            messageDiv.innerHTML = `<strong>${user}:</strong> ${message}`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Enviar mensaje
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessageToChat(currentUser, message, true);
+                // En una implementación real, enviarías el mensaje al servidor WebSocket
+                console.log('Mensaje enviado:', message);
+                messageInput.value = '';
+            }
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', async () => {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+                
+                localVideo.srcObject = localStream;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                statusDiv.style.display = 'block';
+                
+                connectToWebSocket();
+                addMessageToChat('Sistema', 'Has iniciado la transmisión', false);
+                
+                console.log('Transmisión iniciada');
+            } catch (error) {
+                console.error('Error al acceder a los dispositivos:', error);
+                alert('No se pudo acceder a la cámara/micrófono. Asegúrate de dar los permisos necesarios.');
+            }
+        });
+
+        stopBtn.addEventListener('click', stopStreaming);
+
+        sendMessageBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function stopStreaming() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localVideo.srcObject = null;
+            }
+            
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            statusDiv.style.display = 'none';
+            
+            addMessageToChat('Sistema', 'Has detenido la transmisión', false);
+            console.log('Transmisión detenida');
+        }
+
+        // Manejar cierre de página
+        window.addEventListener('beforeunload', () => {
+            stopStreaming();
+        });
+
+        // Mensaje inicial
+        addMessageToChat('Sistema', `Bienvenido al chat, ${currentUser}!`, false);
+    </script>
+</body>
+</html>
