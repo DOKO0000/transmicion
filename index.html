@@ -1,54 +1,106 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <!-- ... (código anterior igual) ... -->
+  <title>Walkie-Talkie para Amigos</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+    #login { margin-bottom: 20px; }
+    #chat { display: none; }
+    button { padding: 10px 15px; margin: 5px; }
+  </style>
 </head>
 <body>
-    <div class="access-container">
-        <h2>Acceso a Transmisión Privada</h2>
-        <div class="form-group">
-            <input type="password" id="accessKey" placeholder="Ingresa la palabra clave">
-        </div>
-        <button class="access-btn" id="accessBtn">Ingresar</button>
-        <div id="accessError" class="access-error"></div>
-    </div>
+  <div id="login">
+    <h2>Acceso Walkie-Talkie</h2>
+    <input type="text" id="usuario" placeholder="Usuario" required>
+    <input type="password" id="clave" placeholder="Clave" required>
+    <button onclick="login()">Entrar</button>
+  </div>
 
-    <script>
-        // ... (configuración de Firebase igual) ...
+  <div id="chat">
+    <h2>Walkie-Talkie <span id="nombre-usuario"></span></h2>
+    <button id="hablar" ontouchstart="iniciarGrabacion()" onmousedown="iniciarGrabacion()" 
+            ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()">Mantén para hablar</button>
+    <div id="mensajes"></div>
+  </div>
 
-        // Verificar acceso
-        async function checkAccess() {
-            const accessKeyInput = document.getElementById('accessKey');
-            const accessError = document.getElementById('accessError');
-            const enteredKey = accessKeyInput.value.trim();
-            
-            if (enteredKey === ACCESS_KEY) {
-                // Deshabilitar botón para evitar múltiples clics
-                document.getElementById('accessBtn').disabled = true;
-                accessError.textContent = "Verificando...";
-                
-                try {
-                    // Obtener y registrar IP
-                    const userIP = await getUserIP();
-                    await registerAccess(userIP);
-                    
-                    // Redirigir después de completar las operaciones
-                    window.location.href = "transmision.html";
-                } catch (error) {
-                    console.error("Error:", error);
-                    accessError.textContent = "Error al verificar acceso. Recarga la página.";
-                    document.getElementById('accessBtn').disabled = false;
-                }
-            } else {
-                accessError.textContent = "Palabra clave incorrecta";
-            }
-        }
+  <script>
+    let grabando = false;
+    let mediaRecorder;
+    let audioChunks = [];
+    let usuarioActual = '';
 
-        // Event listeners mejorados
-        document.getElementById('accessBtn').addEventListener('click', checkAccess);
-        document.getElementById('accessKey').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') checkAccess();
-        });
-    </script>
+    async function login() {
+      const usuario = document.getElementById('usuario').value;
+      const clave = document.getElementById('clave').value;
+      
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, clave })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        usuarioActual = usuario;
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('chat').style.display = 'block';
+        document.getElementById('nombre-usuario').textContent = usuario;
+        inicializarAudio();
+      } else {
+        alert('Acceso denegado. Solo para amigos autorizados.');
+      }
+    }
+
+    async function inicializarAudio() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        
+        mediaRecorder.ondataavailable = event => {
+          audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          audioChunks = [];
+          // Aquí enviarías el audio a otros usuarios (usar WebSocket o WebRTC)
+          agregarMensaje('Tú: ', audioBlob);
+        };
+      } catch (error) {
+        console.error('Error al acceder al micrófono:', error);
+      }
+    }
+
+    function iniciarGrabacion() {
+      if (mediaRecorder && mediaRecorder.state !== 'recording') {
+        mediaRecorder.start();
+        grabando = true;
+        document.getElementById('hablar').style.background = 'red';
+      }
+    }
+
+    function detenerGrabacion() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        grabando = false;
+        document.getElementById('hablar').style.background = '';
+      }
+    }
+
+    function agregarMensaje(usuario, audioBlob) {
+      const mensajesDiv = document.getElementById('mensajes');
+      const mensajeDiv = document.createElement('div');
+      
+      mensajeDiv.innerHTML = `<p>${usuario}</p>`;
+      const audioElement = document.createElement('audio');
+      audioElement.controls = true;
+      audioElement.src = URL.createObjectURL(audioBlob);
+      mensajeDiv.appendChild(audioElement);
+      
+      mensajesDiv.appendChild(mensajeDiv);
+    }
+  </script>
 </body>
 </html>
