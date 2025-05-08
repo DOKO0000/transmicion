@@ -1,27 +1,51 @@
-const express = require('express');
-const app = express();
-const http = require('http').createServer(app);
+// server.js
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
 
-// Usuarios autorizados (reemplaza con tus amigos)
-const usuariosAutorizados = [
-  { usuario: "amigo1", clave: "clave1" },
-  { usuario: "amigo2", clave: "clave2" }
-];
+const usuariosConectados = new Set();
 
-app.use(express.static('public'));
-app.use(express.json());
-
-app.post('/login', (req, res) => {
-  const { usuario, clave } = req.body;
-  const autorizado = usuariosAutorizados.some(u => u.usuario === usuario && u.clave === clave);
+wss.on('connection', (ws) => {
+  let usuario = 'Anónimo';
   
-  if (autorizado) {
-    res.json({ success: true, token: 'token_simulado_' + usuario });
-  } else {
-    res.status(401).json({ success: false });
+  ws.on('message', (message) => {
+    const data = JSON.parse(message);
+    
+    if (data.tipo === "conexion") {
+      usuario = data.usuario;
+      usuariosConectados.add(usuario);
+      broadcastUsuarios();
+    } 
+    else if (data.tipo === "audio") {
+      // Reenviar el audio a todos los demás usuarios
+      wss.clients.forEach((client) => {
+        if (client !== ws && client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            tipo: "audio",
+            usuario: usuario,
+            audio: data.audio,
+            formato: data.formato
+          }));
+        }
+      });
+    }
+  });
+  
+  ws.on('close', () => {
+    usuariosConectados.delete(usuario);
+    broadcastUsuarios();
+  });
+  
+  function broadcastUsuarios() {
+    const listaUsuarios = Array.from(usuariosConectados);
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          tipo: "usuarios",
+          usuarios: listaUsuarios
+        }));
+      }
+    });
   }
 });
 
-http.listen(3000, () => {
-  console.log('Servidor en http://localhost:3000');
-});
+console.log('Servidor WebSocket corriendo en ws://localhost:8080');
