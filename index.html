@@ -1,67 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso a Transmisión Privada</title>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        
-        .access-container {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        
-        .access-container h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-        
-        .access-btn {
-            width: 100%;
-            padding: 12px;
-            background-color: #4285f4;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
-        .access-error {
-            color: #ea4335;
-            margin-top: 15px;
-        }
-    </style>
+    <!-- ... (código anterior igual) ... -->
 </head>
 <body>
     <div class="access-container">
@@ -69,50 +9,12 @@
         <div class="form-group">
             <input type="password" id="accessKey" placeholder="Ingresa la palabra clave">
         </div>
-        <button class="access-btn" onclick="checkAccess()">Ingresar</button>
+        <button class="access-btn" id="accessBtn">Ingresar</button>
         <div id="accessError" class="access-error"></div>
     </div>
 
     <script>
-        // Configuración de Firebase (reemplaza con tus datos)
-        const firebaseConfig = {
-            apiKey: "AIzaSyDzQjZ4QZQZQZQZQZQZQZQZQZQZQZQZQZQ",
-            authDomain: "fotocredencial-30d54.firebaseapp.com",
-            databaseURL: "https://fotocredencial-30d54-default-rtdb.firebaseio.com",
-            projectId: "fotocredencial-30d54",
-            storageBucket: "fotocredencial-30d54.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:1234567890abcdef"
-        };
-
-        // Inicializar Firebase
-        firebase.initializeApp(firebaseConfig);
-        const database = firebase.database();
-
-        // Palabra clave de acceso
-        const ACCESS_KEY = "MOOKA";
-
-        // Obtener la IP del usuario
-        async function getUserIP() {
-            try {
-                const response = await fetch('https://api.ipify.org?format=json');
-                const data = await response.json();
-                return data.ip;
-            } catch (error) {
-                console.error("Error al obtener IP:", error);
-                return "Desconocida";
-            }
-        }
-
-        // Registrar acceso en Firebase
-        async function registerAccess(ip) {
-            const timestamp = new Date().toISOString();
-            await database.ref('accessLogs').push().set({
-                ip: ip,
-                timestamp: timestamp,
-                accessKeyUsed: document.getElementById('accessKey').value.trim()
-            });
-        }
+        // ... (configuración de Firebase igual) ...
 
         // Verificar acceso
         async function checkAccess() {
@@ -121,18 +23,29 @@
             const enteredKey = accessKeyInput.value.trim();
             
             if (enteredKey === ACCESS_KEY) {
-                // Obtener y registrar IP
-                const userIP = await getUserIP();
-                await registerAccess(userIP);
+                // Deshabilitar botón para evitar múltiples clics
+                document.getElementById('accessBtn').disabled = true;
+                accessError.textContent = "Verificando...";
                 
-                // Redirigir a la página de transmisión
-                window.location.href = "transmision.html";
+                try {
+                    // Obtener y registrar IP
+                    const userIP = await getUserIP();
+                    await registerAccess(userIP);
+                    
+                    // Redirigir después de completar las operaciones
+                    window.location.href = "transmision.html";
+                } catch (error) {
+                    console.error("Error:", error);
+                    accessError.textContent = "Error al verificar acceso. Recarga la página.";
+                    document.getElementById('accessBtn').disabled = false;
+                }
             } else {
                 accessError.textContent = "Palabra clave incorrecta";
             }
         }
 
-        // Permitir acceso con Enter
+        // Event listeners mejorados
+        document.getElementById('accessBtn').addEventListener('click', checkAccess);
         document.getElementById('accessKey').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') checkAccess();
         });
