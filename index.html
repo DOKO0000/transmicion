@@ -21,7 +21,7 @@
   <h2>Walkie-Talkie Privado Mooka</h2>
   <p>Sistema de comunicación en tiempo real para amigos</p>
   <input type="text" id="usuario" placeholder="Tu nombre de usuario" required><br>
-  <input type="password" id="clave" placeholder="Clave secreta (mooka)" required><br>
+  <input type="password" id="clave" placeholder="Clave" required><br>
   <button onclick="conectar()">Conectar</button>
 </div>
 
@@ -59,7 +59,7 @@
     }
     
     if (clave !== CLAVE_SECRETA) {
-      alert("Clave incorrecta. Solo para amigos que conocen 'mooka'");
+      alert("Clave incorrecta. Solo para amigos que conocen ''");
       return;
     }
     
