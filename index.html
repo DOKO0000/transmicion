@@ -1,76 +1,170 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Walkie-Talkie Mooka</title>
+  <title>Walkie-Talkie Mooka - Tiempo Real</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-    #login { margin: 20px auto; width: 300px; }
-    #chat { display: none; margin: 20px auto; width: 300px; }
-    button { padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; }
-    #hablar { background: #f44336; width: 200px; height: 200px; border-radius: 100px; font-size: 20px; }
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+    #login, #chat { margin: 20px auto; max-width: 500px; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
+    #chat { display: none; }
+    button { padding: 12px 24px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    #hablar { background: #f44336; width: 120px; height: 120px; border-radius: 60px; font-size: 18px; }
     #hablar:active { background: #d32f2f; }
-    input { padding: 10px; margin: 5px; width: 200px; }
+    input { padding: 10px; margin: 8px; width: 80%; max-width: 300px; }
+    #usuarios-conectados { margin: 15px 0; font-weight: bold; }
+    .mensaje-audio { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+    audio { width: 100%; max-width: 400px; }
   </style>
 </head>
 <body>
 
 <div id="login">
-  <h2>Walkie-Talkie Privado</h2>
-  <p>Solo para amigos que conocen la clave</p>
-  <input type="text" id="usuario" placeholder="Tu nombre" required><br>
-  <input type="password" id="clave" placeholder="Clave secreta" required><br>
-  <button onclick="verificarClave()">Entrar</button>
+  <h2>Walkie-Talkie Privado Mooka</h2>
+  <p>Sistema de comunicación en tiempo real para amigos</p>
+  <input type="text" id="usuario" placeholder="Tu nombre de usuario" required><br>
+  <input type="password" id="clave" placeholder="Clave secreta (mooka)" required><br>
+  <button onclick="conectar()">Conectar</button>
 </div>
 
 <div id="chat">
-  <h2>Hola, <span id="nombre-usuario"></span>!</h2>
-  <p>Mantén presionado para hablar:</p>
+  <h2>Walkie-Talkie: <span id="nombre-usuario"></span></h2>
+  <div id="usuarios-conectados">Conectados: <span id="lista-usuarios">0</span></div>
+  
   <button id="hablar" ontouchstart="iniciarGrabacion()" onmousedown="iniciarGrabacion()" 
           ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()">HABLAR</button>
+  
+  <h3>Mensajes recientes:</h3>
   <div id="mensajes"></div>
 </div>
 
 <script>
-  const CLAVE_SECRETA = "mooka"; // La clave que todos deben saber
+  // Configuración
+  const CLAVE_SECRETA = "mooka";
+  const SERVER_URL = "wss://tu-servidor-websocket.com"; // Reemplaza con tu servidor WebSocket
+  
+  // Variables globales
+  let socket;
   let mediaRecorder;
   let audioChunks = [];
+  let usuarioActual = "";
+  let stream;
 
-  function verificarClave() {
-    const usuario = document.getElementById('usuario').value;
+  // Conexión inicial
+  function conectar() {
+    const usuario = document.getElementById('usuario').value.trim();
     const clave = document.getElementById('clave').value;
     
-    if (clave === CLAVE_SECRETA) {
+    if (!usuario) {
+      alert("Por favor ingresa un nombre de usuario");
+      return;
+    }
+    
+    if (clave !== CLAVE_SECRETA) {
+      alert("Clave incorrecta. Solo para amigos que conocen 'mooka'");
+      return;
+    }
+    
+    usuarioActual = usuario;
+    iniciarConexionWebSocket();
+  }
+
+  // Configurar WebSocket
+  function iniciarConexionWebSocket() {
+    socket = new WebSocket(SERVER_URL);
+    
+    socket.onopen = () => {
+      console.log("Conexión WebSocket establecida");
       document.getElementById('login').style.display = 'none';
       document.getElementById('chat').style.display = 'block';
-      document.getElementById('nombre-usuario').textContent = usuario;
+      document.getElementById('nombre-usuario').textContent = usuarioActual;
+      
+      // Enviar mensaje de conexión
+      socket.send(JSON.stringify({
+        tipo: "conexion",
+        usuario: usuarioActual
+      }));
+      
+      // Inicializar audio
       inicializarAudio();
-    } else {
-      alert("Clave incorrecta. Solo para amigos que conocen 'mooka'");
-    }
+    };
+    
+    socket.onmessage = (event) => {
+      const mensaje = JSON.parse(event.data);
+      
+      switch(mensaje.tipo) {
+        case "usuarios":
+          actualizarListaUsuarios(mensaje.usuarios);
+          break;
+        case "audio":
+          reproducirAudio(mensaje.audio, mensaje.usuario);
+          break;
+      }
+    };
+    
+    socket.onclose = () => {
+      console.log("Conexión cerrada");
+      alert("Se perdió la conexión. Recarga la página para reconectar.");
+    };
   }
 
+  // Actualizar lista de usuarios conectados
+  function actualizarListaUsuarios(usuarios) {
+    const usuariosConectados = usuarios.filter(u => u !== usuarioActual);
+    document.getElementById('lista-usuarios').textContent = 
+      usuariosConectados.length > 0 ? usuariosConectados.join(", ") : "Solo tú";
+  }
+
+  // Configurar grabación de audio
   async function inicializarAudio() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
       
-      mediaRecorder.ondataavailable = event => {
-        audioChunks.push(event.data);
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+          const arrayBuffer = await event.data.arrayBuffer();
+          const audioBase64 = arrayBufferToBase64(arrayBuffer);
+          
+          // Enviar audio a través de WebSocket
+          socket.send(JSON.stringify({
+            tipo: "audio",
+            usuario: usuarioActual,
+            audio: audioBase64,
+            formato: "webm"
+          }));
+        }
       };
       
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        audioChunks = [];
-        reproducirAudio(audioBlob);
-      };
     } catch (error) {
-      alert("Error al acceder al micrófono: " + error.message);
+      console.error("Error al acceder al micrófono:", error);
+      alert("No se pudo acceder al micrófono. Asegúrate de permitir el acceso.");
     }
   }
 
+  // Convertir ArrayBuffer a Base64
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+  }
+
+  // Convertir Base64 a ArrayBuffer
+  function base64ToArrayBuffer(base64) {
+    const binaryString = window.atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  // Control de grabación
   function iniciarGrabacion() {
     if (mediaRecorder && mediaRecorder.state !== 'recording') {
-      mediaRecorder.start();
+      audioChunks = [];
+      mediaRecorder.start(100); // Capturar datos cada 100ms para menor latencia
       document.getElementById('hablar').textContent = "GRABANDO...";
     }
   }
@@ -82,17 +176,21 @@
     }
   }
 
-  function reproducirAudio(audioBlob) {
-    const audioURL = URL.createObjectURL(audioBlob);
-    const audioElement = new Audio(audioURL);
-    audioElement.controls = true;
+  // Reproducir audio recibido
+  function reproducirAudio(audioBase64, usuario) {
+    const audioBuffer = base64ToArrayBuffer(audioBase64);
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
+    const audioUrl = URL.createObjectURL(audioBlob);
     
-    const mensajesDiv = document.getElementById('mensajes');
     const mensajeDiv = document.createElement('div');
-    mensajeDiv.innerHTML = `<p>${document.getElementById('usuario').value}:</p>`;
-    mensajeDiv.appendChild(audioElement);
-    mensajesDiv.appendChild(mensajeDiv);
+    mensajeDiv.className = 'mensaje-audio';
+    mensajeDiv.innerHTML = `<p>${usuario}:</p>`;
     
+    const audioElement = new Audio(audioUrl);
+    audioElement.controls = true;
+    mensajeDiv.appendChild(audioElement);
+    
+    document.getElementById('mensajes').prepend(mensajeDiv);
     audioElement.play();
   }
 </script>
