@@ -1,106 +1,101 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Walkie-Talkie para Amigos</title>
+  <title>Walkie-Talkie Mooka</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-    #login { margin-bottom: 20px; }
-    #chat { display: none; }
-    button { padding: 10px 15px; margin: 5px; }
+    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+    #login { margin: 20px auto; width: 300px; }
+    #chat { display: none; margin: 20px auto; width: 300px; }
+    button { padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; }
+    #hablar { background: #f44336; width: 200px; height: 200px; border-radius: 100px; font-size: 20px; }
+    #hablar:active { background: #d32f2f; }
+    input { padding: 10px; margin: 5px; width: 200px; }
   </style>
 </head>
 <body>
-  <div id="login">
-    <h2>Acceso Walkie-Talkie</h2>
-    <input type="text" id="usuario" placeholder="Usuario" required>
-    <input type="password" id="clave" placeholder="Clave" required>
-    <button onclick="login()">Entrar</button>
-  </div>
 
-  <div id="chat">
-    <h2>Walkie-Talkie <span id="nombre-usuario"></span></h2>
-    <button id="hablar" ontouchstart="iniciarGrabacion()" onmousedown="iniciarGrabacion()" 
-            ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()">Mantén para hablar</button>
-    <div id="mensajes"></div>
-  </div>
+<div id="login">
+  <h2>Walkie-Talkie Privado</h2>
+  <p>Solo para amigos que conocen la clave</p>
+  <input type="text" id="usuario" placeholder="Tu nombre" required><br>
+  <input type="password" id="clave" placeholder="Clave secreta" required><br>
+  <button onclick="verificarClave()">Entrar</button>
+</div>
 
-  <script>
-    let grabando = false;
-    let mediaRecorder;
-    let audioChunks = [];
-    let usuarioActual = '';
+<div id="chat">
+  <h2>Hola, <span id="nombre-usuario"></span>!</h2>
+  <p>Mantén presionado para hablar:</p>
+  <button id="hablar" ontouchstart="iniciarGrabacion()" onmousedown="iniciarGrabacion()" 
+          ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()">HABLAR</button>
+  <div id="mensajes"></div>
+</div>
 
-    async function login() {
-      const usuario = document.getElementById('usuario').value;
-      const clave = document.getElementById('clave').value;
-      
-      const response = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, clave })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        usuarioActual = usuario;
-        document.getElementById('login').style.display = 'none';
-        document.getElementById('chat').style.display = 'block';
-        document.getElementById('nombre-usuario').textContent = usuario;
-        inicializarAudio();
-      } else {
-        alert('Acceso denegado. Solo para amigos autorizados.');
-      }
+<script>
+  const CLAVE_SECRETA = "mooka"; // La clave que todos deben saber
+  let mediaRecorder;
+  let audioChunks = [];
+
+  function verificarClave() {
+    const usuario = document.getElementById('usuario').value;
+    const clave = document.getElementById('clave').value;
+    
+    if (clave === CLAVE_SECRETA) {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('chat').style.display = 'block';
+      document.getElementById('nombre-usuario').textContent = usuario;
+      inicializarAudio();
+    } else {
+      alert("Clave incorrecta. Solo para amigos que conocen 'mooka'");
     }
+  }
 
-    async function inicializarAudio() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.ondataavailable = event => {
-          audioChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-          audioChunks = [];
-          // Aquí enviarías el audio a otros usuarios (usar WebSocket o WebRTC)
-          agregarMensaje('Tú: ', audioBlob);
-        };
-      } catch (error) {
-        console.error('Error al acceder al micrófono:', error);
-      }
-    }
-
-    function iniciarGrabacion() {
-      if (mediaRecorder && mediaRecorder.state !== 'recording') {
-        mediaRecorder.start();
-        grabando = true;
-        document.getElementById('hablar').style.background = 'red';
-      }
-    }
-
-    function detenerGrabacion() {
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        grabando = false;
-        document.getElementById('hablar').style.background = '';
-      }
-    }
-
-    function agregarMensaje(usuario, audioBlob) {
-      const mensajesDiv = document.getElementById('mensajes');
-      const mensajeDiv = document.createElement('div');
+  async function inicializarAudio() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
       
-      mensajeDiv.innerHTML = `<p>${usuario}</p>`;
-      const audioElement = document.createElement('audio');
-      audioElement.controls = true;
-      audioElement.src = URL.createObjectURL(audioBlob);
-      mensajeDiv.appendChild(audioElement);
+      mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
+      };
       
-      mensajesDiv.appendChild(mensajeDiv);
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        audioChunks = [];
+        reproducirAudio(audioBlob);
+      };
+    } catch (error) {
+      alert("Error al acceder al micrófono: " + error.message);
     }
-  </script>
+  }
+
+  function iniciarGrabacion() {
+    if (mediaRecorder && mediaRecorder.state !== 'recording') {
+      mediaRecorder.start();
+      document.getElementById('hablar').textContent = "GRABANDO...";
+    }
+  }
+
+  function detenerGrabacion() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+      document.getElementById('hablar').textContent = "HABLAR";
+    }
+  }
+
+  function reproducirAudio(audioBlob) {
+    const audioURL = URL.createObjectURL(audioBlob);
+    const audioElement = new Audio(audioURL);
+    audioElement.controls = true;
+    
+    const mensajesDiv = document.getElementById('mensajes');
+    const mensajeDiv = document.createElement('div');
+    mensajeDiv.innerHTML = `<p>${document.getElementById('usuario').value}:</p>`;
+    mensajeDiv.appendChild(audioElement);
+    mensajesDiv.appendChild(mensajeDiv);
+    
+    audioElement.play();
+  }
+</script>
+
 </body>
 </html>
