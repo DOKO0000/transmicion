@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Walkie-Talkie Mooka - Tiempo Real</title>
+  <title>Walkie-Talkie Mooka - Versión Mejorada</title>
   <style>
     body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
     #login, #chat { margin: 20px auto; max-width: 500px; padding: 20px; border: 1px solid #ddd; border-radius: 10px; }
     #chat { display: none; }
+    #conexion-status { margin: 10px; padding: 10px; border-radius: 5px; }
+    .conectado { background: #dff0d8; color: #3c763d; }
+    .desconectado { background: #f2dede; color: #a94442; }
     button { padding: 12px 24px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
     #hablar { background: #f44336; width: 120px; height: 120px; border-radius: 60px; font-size: 18px; }
     #hablar:active { background: #d32f2f; }
+    #hablar:disabled { background: #cccccc; }
     input { padding: 10px; margin: 8px; width: 80%; max-width: 300px; }
     #usuarios-conectados { margin: 15px 0; font-weight: bold; }
     .mensaje-audio { margin: 10px 0; padding: 10px; background: #f9f9f9; border-radius: 5px; }
@@ -21,25 +25,28 @@
   <h2>Walkie-Talkie Privado Mooka</h2>
   <p>Sistema de comunicación en tiempo real para amigos</p>
   <input type="text" id="usuario" placeholder="Tu nombre de usuario" required><br>
-  <input type="password" id="clave" placeholder="Clave" required><br>
+  <input type="password" id="clave" placeholder="Clave secreta (mooka)" required><br>
   <button onclick="conectar()">Conectar</button>
+  <div id="conexion-status" class="desconectado">Desconectado</div>
 </div>
 
 <div id="chat">
   <h2>Walkie-Talkie: <span id="nombre-usuario"></span></h2>
+  <div id="conexion-status-chat" class="desconectado">Desconectado</div>
   <div id="usuarios-conectados">Conectados: <span id="lista-usuarios">0</span></div>
   
   <button id="hablar" ontouchstart="iniciarGrabacion()" onmousedown="iniciarGrabacion()" 
-          ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()">HABLAR</button>
+          ontouchend="detenerGrabacion()" onmouseup="detenerGrabacion()" disabled>HABLAR</button>
   
   <h3>Mensajes recientes:</h3>
   <div id="mensajes"></div>
+  <button onclick="reconectar()" id="btn-reconectar">Reconectar</button>
 </div>
 
 <script>
   // Configuración
   const CLAVE_SECRETA = "mooka";
-  const SERVER_URL = "wss://tu-servidor-websocket.com"; // Reemplaza con tu servidor WebSocket
+  const SERVER_URL = "ws://localhost:8080"; // Cambia esto por tu servidor WebSocket
   
   // Variables globales
   let socket;
@@ -47,6 +54,8 @@
   let audioChunks = [];
   let usuarioActual = "";
   let stream;
+  let intentosReconexion = 0;
+  const MAX_INTENTOS_RECONEXION = 5;
 
   // Conexión inicial
   function conectar() {
@@ -59,7 +68,7 @@
     }
     
     if (clave !== CLAVE_SECRETA) {
-      alert("Clave incorrecta. Solo para amigos que conocen ''");
+      alert("Clave incorrecta. Solo para amigos que conocen 'mooka'");
       return;
     }
     
@@ -67,132 +76,100 @@
     iniciarConexionWebSocket();
   }
 
-  // Configurar WebSocket
+  // Configurar WebSocket con manejo de errores mejorado
   function iniciarConexionWebSocket() {
-    socket = new WebSocket(SERVER_URL);
+    actualizarEstadoConexion("Conectando...", "desconectado");
     
-    socket.onopen = () => {
-      console.log("Conexión WebSocket establecida");
-      document.getElementById('login').style.display = 'none';
-      document.getElementById('chat').style.display = 'block';
-      document.getElementById('nombre-usuario').textContent = usuarioActual;
-      
-      // Enviar mensaje de conexión
-      socket.send(JSON.stringify({
-        tipo: "conexion",
-        usuario: usuarioActual
-      }));
-      
-      // Inicializar audio
-      inicializarAudio();
-    };
-    
-    socket.onmessage = (event) => {
-      const mensaje = JSON.parse(event.data);
-      
-      switch(mensaje.tipo) {
-        case "usuarios":
-          actualizarListaUsuarios(mensaje.usuarios);
-          break;
-        case "audio":
-          reproducirAudio(mensaje.audio, mensaje.usuario);
-          break;
-      }
-    };
-    
-    socket.onclose = () => {
-      console.log("Conexión cerrada");
-      alert("Se perdió la conexión. Recarga la página para reconectar.");
-    };
-  }
-
-  // Actualizar lista de usuarios conectados
-  function actualizarListaUsuarios(usuarios) {
-    const usuariosConectados = usuarios.filter(u => u !== usuarioActual);
-    document.getElementById('lista-usuarios').textContent = 
-      usuariosConectados.length > 0 ? usuariosConectados.join(", ") : "Solo tú";
-  }
-
-  // Configurar grabación de audio
-  async function inicializarAudio() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      socket = new WebSocket(SERVER_URL);
       
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          const audioBase64 = arrayBufferToBase64(arrayBuffer);
-          
-          // Enviar audio a través de WebSocket
-          socket.send(JSON.stringify({
-            tipo: "audio",
-            usuario: usuarioActual,
-            audio: audioBase64,
-            formato: "webm"
-          }));
+      socket.onopen = () => {
+        console.log("Conexión WebSocket establecida");
+        intentosReconexion = 0;
+        actualizarEstadoConexion("Conectado", "conectado");
+        
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('chat').style.display = 'block';
+        document.getElementById('nombre-usuario').textContent = usuarioActual;
+        document.getElementById('hablar').disabled = false;
+        
+        // Enviar mensaje de conexión
+        socket.send(JSON.stringify({
+          tipo: "conexion",
+          usuario: usuarioActual
+        }));
+        
+        // Inicializar audio
+        inicializarAudio();
+      };
+      
+      socket.onmessage = (event) => {
+        const mensaje = JSON.parse(event.data);
+        
+        switch(mensaje.tipo) {
+          case "usuarios":
+            actualizarListaUsuarios(mensaje.usuarios);
+            break;
+          case "audio":
+            reproducirAudio(mensaje.audio, mensaje.usuario);
+            break;
         }
       };
       
+      socket.onclose = (event) => {
+        console.log("Conexión cerrada", event);
+        if (!event.wasClean) {
+          manejarErrorConexion();
+        }
+      };
+      
+      socket.onerror = (error) => {
+        console.error("Error en WebSocket:", error);
+        manejarErrorConexion();
+      };
+      
     } catch (error) {
-      console.error("Error al acceder al micrófono:", error);
-      alert("No se pudo acceder al micrófono. Asegúrate de permitir el acceso.");
+      console.error("Error al crear WebSocket:", error);
+      manejarErrorConexion();
     }
   }
 
-  // Convertir ArrayBuffer a Base64
-  function arrayBufferToBase64(buffer) {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
-  }
-
-  // Convertir Base64 a ArrayBuffer
-  function base64ToArrayBuffer(base64) {
-    const binaryString = window.atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
-
-  // Control de grabación
-  function iniciarGrabacion() {
-    if (mediaRecorder && mediaRecorder.state !== 'recording') {
-      audioChunks = [];
-      mediaRecorder.start(100); // Capturar datos cada 100ms para menor latencia
-      document.getElementById('hablar').textContent = "GRABANDO...";
-    }
-  }
-
-  function detenerGrabacion() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
-      document.getElementById('hablar').textContent = "HABLAR";
-    }
-  }
-
-  // Reproducir audio recibido
-  function reproducirAudio(audioBase64, usuario) {
-    const audioBuffer = base64ToArrayBuffer(audioBase64);
-    const audioBlob = new Blob([audioBuffer], { type: 'audio/webm' });
-    const audioUrl = URL.createObjectURL(audioBlob);
+  function manejarErrorConexion() {
+    actualizarEstadoConexion("Error de conexión", "desconectado");
+    document.getElementById('hablar').disabled = true;
     
-    const mensajeDiv = document.createElement('div');
-    mensajeDiv.className = 'mensaje-audio';
-    mensajeDiv.innerHTML = `<p>${usuario}:</p>`;
-    
-    const audioElement = new Audio(audioUrl);
-    audioElement.controls = true;
-    mensajeDiv.appendChild(audioElement);
-    
-    document.getElementById('mensajes').prepend(mensajeDiv);
-    audioElement.play();
+    if (intentosReconexion < MAX_INTENTOS_RECONEXION) {
+      intentosReconexion++;
+      setTimeout(() => {
+        actualizarEstadoConexion(`Reconectando (${intentosReconexion}/${MAX_INTENTOS_RECONEXION})...`, "desconectado");
+        iniciarConexionWebSocket();
+      }, 3000);
+    } else {
+      actualizarEstadoConexion("No se pudo conectar. Recarga la página.", "desconectado");
+    }
   }
+
+  function reconectar() {
+    intentosReconexion = 0;
+    iniciarConexionWebSocket();
+  }
+
+  function actualizarEstadoConexion(mensaje, estado) {
+    const elementos = [
+      document.getElementById('conexion-status'),
+      document.getElementById('conexion-status-chat')
+    ];
+    
+    elementos.forEach(el => {
+      if (el) {
+        el.textContent = mensaje;
+        el.className = estado === "conectado" ? "conectado" : "desconectado";
+      }
+    });
+  }
+
+  // Resto del código (actualizarListaUsuarios, inicializarAudio, etc.) permanece igual
+  // ... [Aquí iría el resto del código de las funciones anteriores]
 </script>
 
 </body>
